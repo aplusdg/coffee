@@ -1,6 +1,6 @@
 # A+ Coffee Atelier
 
-An interactive 3D cappuccino experience for A+ Design Group, built with Vite and Three.js. All website copy is in English. Choose hot ceramic or a tall, handle-free iced glass, Regular or Strong, and Heart, Star or A+ logo latte art. Watch espresso, milk and foam fill the cup, then drag to rotate. The cup's inner profile controls every surface radius, so liquid and foam remain within the walls. Iced drinks have rounded, refractive ice with subtle trapped bubbles; hot drinks have subtle steam. A wider, animated stream falls from above the rim, with moving surface detail and small impact ripples contained inside the cup. The interface supports phones, keyboard controls and reduced motion preferences.
+An interactive 3D Australian café experience for A+ Design Group, built with Vite and Three.js. All website copy is in English. Choose hot ceramic or a tall, handle-free iced glass, four coffees (Flat White, Latte, Cappuccino and Long Black), and Heart, Star or A+ logo latte art for milk drinks. Watch espresso, milk and foam fill the cup, then drag to rotate. The cup's inner profile controls every surface radius, so liquid and foam remain within the walls. Iced drinks have rounded, refractive ice with subtle trapped bubbles; hot drinks have subtle steam. A wider, animated stream falls from above the rim, with moving surface detail and small impact ripples contained inside the cup. The interface supports phones, keyboard controls and reduced motion preferences.
 
 ## Develop
 
@@ -21,11 +21,24 @@ npm run check:dist
 npm run preview
 ```
 
-`dist/` is the deployable site. There are no external model or font downloads. Tests cover fill containment, recipe strength, request validation and timestamps. A WebGL fallback keeps the order interface usable if 3D rendering is unsupported.
+`dist/` is the deployable site. There are no external model or font downloads. Tests cover handle clearance, fill containment, menu proportions, request validation and timestamps. A WebGL fallback keeps the order interface usable if 3D rendering is unsupported.
 
 ## Coffee requests and automatic email
 
-First enter a name and choose **Right now** or a future date/time. Then choose the temperature, strength and latte art. **Make my coffee** starts the 3D preparation and immediately submits an automatic email notification to **terrinobb@gmail.com** using FormSubmit's AJAX endpoint. No account, API key, backend, or email application is needed. Custom time is the requested pickup time: the notification is sent immediately, not at that future time. Each request includes the complete recipe, a browser-local timezone, an ISO timestamp and a request ID. The coffee host still needs to confirm the request.
+First enter a name and choose **Right now** or a future date/time. Then choose Hot or Iced, one of four coffees and, for milk drinks, the latte art. **Make my coffee** starts the 3D preparation and immediately submits an automatic email notification to **terrinobb@gmail.com** using FormSubmit's AJAX endpoint. No account, API key, backend, or email application is needed. Custom time is the requested pickup time: the notification is sent immediately, not at that future time. Each request includes the complete recipe, a browser-local timezone, an ISO timestamp and a request ID. The coffee host still needs to confirm the request.
+
+### Four house recipes
+
+| Coffee     | Hot: espresso / milk / foam       | Iced: espresso / milk / cold foam                |
+| ---------- | --------------------------------- | ------------------------------------------------ |
+| Flat White | 40 / 140 / 5 mL                   | 40 / 140 / 4 mL                                  |
+| Latte      | 30 / 180 / 15 mL                  | 30 / 180 / 12 mL                                 |
+| Cappuccino | 30 / 120 / 45 mL                  | 30 / 120 / 35 mL                                 |
+| Long Black | 150 mL water, then 60 mL espresso | 150 mL cold water, then 60 mL espresso, over ice |
+
+These are representative house recipes; café recipes vary. Iced milk drinks use a cold-foam finish so the selected art can be added. Flat White has the least foam, Latte a thin layer, Cappuccino a generous layer, and Long Black has no milk, foam or art. Stages and pour durations come from these quantities. The tapered cup's volume is integrated and inverted to set the liquid height, so equal heights are not mistaken for equal volumes. Drinks share a target fill level for each cup style, with extra ice headroom. Notification subjects and contents include the selected drink and recipe.
+
+The ceramic handle uses an external tube path, not an intersecting ring. A geometry check validates every handle vertex against the cup cavity, including the two attachment points.
 
 ### Activate notifications once
 

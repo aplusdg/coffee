@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#e8dfd2" />
     <meta
       name="description"
-      content="A little coffee ritual by A+ Design Group. Craft a hot or iced cappuccino and send your coffee request."
+      content="A little coffee ritual by A+ Design Group. Craft your favourite Australian café coffee and send your coffee request."
     />
     <title>A+ Coffee Atelier</title>
   </head>
@@ -25,20 +25,20 @@
           <div class="eyebrow"><span></span> YOUR MOMENT OF SLOW</div>
           <h1>Your day.<br />A little softer.</h1>
           <p>
-            Rich espresso. Silky milk. A cloud of foam.<br />A cappuccino, just
-            the way you like it.
+            Rich espresso. Silky milk. A cloud of foam.<br />Your café
+            favourite, just the way you like it.
           </p>
           <div class="note"><span>01 — 03</span> CHOOSE · CREATE · ENJOY</div>
         </section>
         <section
           class="scene-wrap"
-          aria-label="Interactive 3D cappuccino. Drag to rotate."
+          aria-label="Interactive 3D coffee. Drag to rotate."
         >
           <div class="scene-halo"></div>
           <div id="scene"></div>
           <div class="scene-label">
-            <span id="cup-label">THE WARM CLASSIC</span
-            ><small>CAPPUCCINO / HANDCRAFTED FOR YOU</small>
+            <span id="cup-label">HOT CAPPUCCINO</span
+            ><small>AUSTRALIAN CAFÉ CLASSICS / MADE FOR YOU</small>
           </div>
           <div class="drag-hint">
             Drag to rotate · A little movement, a little magic
@@ -115,21 +115,36 @@
             </div>
           </fieldset>
           <fieldset>
-            <legend><span>04</span> Your coffee strength</legend>
-            <div class="choices strength" id="strength">
+            <legend><span>04</span> Your café favourite</legend>
+            <div class="choices coffee-menu" id="coffee">
               <button
                 type="button"
-                data-value="regular"
+                data-value="flat-white"
+                aria-pressed="false"
+              >
+                <span>Flat White<small>Silky · little foam</small></span>
+              </button>
+              <button type="button" data-value="latte" aria-pressed="false">
+                <span>Latte<small>Milky · mellow</small></span>
+              </button>
+              <button
+                type="button"
+                data-value="cappuccino"
                 class="selected"
                 aria-pressed="true"
               >
-                <span>Regular<small>Soft & balanced</small></span></button
-              ><button type="button" data-value="strong" aria-pressed="false">
-                <span>Strong<small>Rich & bold</small></span>
+                <span>Cappuccino<small>Rich · extra foam</small></span>
+              </button>
+              <button
+                type="button"
+                data-value="long-black"
+                aria-pressed="false"
+              >
+                <span>Long Black<small>Espresso & water</small></span>
               </button>
             </div>
           </fieldset>
-          <fieldset>
+          <fieldset id="art-field">
             <legend><span>05</span> A finishing touch</legend>
             <div class="choices art-choices" id="art">
               <button
@@ -150,9 +165,12 @@
               </button>
             </div>
           </fieldset>
+          <p id="coffee-description" class="coffee-description">
+            Rich espresso · pillowy foam
+          </p>
           <div class="recipe">
-            <span>ESPRESSO + MILK + FOAM</span
-            ><b id="recipe-ratio">1 : 1 : 1</b>
+            <span id="recipe-label">ESPRESSO / MILK / FOAM</span
+            ><b id="recipe-ratio">30 / 120 / 45 mL</b>
           </div>
           <button id="make" class="make" type="submit">
             Make my coffee <span aria-hidden="true" class="arrow-icon"></span>

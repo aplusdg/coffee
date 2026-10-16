@@ -1,8 +1,10 @@
+import { getRecipe } from "./recipe.js";
 export const DEFAULT_RECIPIENTS = ["terrinobb@gmail.com"];
 export function buildOrder(
-  { name, temperature, strength, art, timing, pickupValue },
+  { name, temperature, coffee = "cappuccino", art, timing, pickupValue },
   now = new Date(),
 ) {
+  const recipe = getRecipe(coffee, temperature);
   const customer = name.trim();
   if (!customer || customer.length > 80)
     throw new Error("Please enter your name (up to 80 characters).");
@@ -21,12 +23,13 @@ export function buildOrder(
   return {
     order_id: globalThis.crypto.randomUUID(),
     customer_name: customer,
-    coffee: "Cappuccino",
+    coffee: recipe.name,
+    recipe: recipe.ratioLabel + ": " + recipe.ratio,
     temperature: temperature === "iced" ? "Iced" : "Hot",
-    strength: strength === "strong" ? "Strong" : "Regular",
-    latte_art:
-      { heart: "Heart", star: "Star", logo: "A+ Design Group logo" }[art] ||
-      "Heart",
+    latte_art: recipe.hasMilk
+      ? { heart: "Heart", star: "Star", logo: "A+ Design Group logo" }[art] ||
+        "Heart"
+      : "None",
     pickup_time: `${timing === "now" ? "Right now — " : ""}${display} (${zone})`,
     pickup_mode: timing === "custom" ? "custom" : "now",
     pickup_iso: pickup.toISOString(),

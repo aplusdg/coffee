@@ -3,12 +3,13 @@ import { DEFAULT_RECIPIENTS } from "./order.js";
 export const NOTIFICATION_ENDPOINT = `https://formsubmit.co/ajax/${DEFAULT_RECIPIENTS[0]}`;
 export function notificationPayload(order) {
   return {
-    _subject: `Coffee request: ${order.customer_name} — ${order.temperature} ${order.strength} cappuccino`,
+    _subject: `Coffee request: ${order.customer_name} — ${order.temperature} ${order.coffee}`,
     _template: "table",
     _captcha: "false",
     Name: order.customer_name,
-    Coffee: `${order.temperature} ${order.strength} ${order.coffee}`,
+    Coffee: `${order.temperature} ${order.coffee}`,
     "Latte art": order.latte_art,
+    Recipe: order.recipe,
     "Requested time": order.pickup_time,
     "Pickup timestamp": order.pickup_iso,
     "Time zone": order.pickup_timezone,

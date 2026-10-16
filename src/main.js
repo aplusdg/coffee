@@ -1,7 +1,15 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
-import { FLOOR, DURATION, liquidRadius, recipeAt, smooth } from "./recipe.js";
+import {
+  FLOOR,
+  DURATION,
+  liquidRadius,
+  recipeAt,
+  getRecipe,
+  smooth,
+} from "./recipe.js";
+import { createHandleGeometry } from "./cup-geometry.js";
 import { createArtTexture } from "./brand.js";
 import { buildOrder } from "./order.js";
 import { sendNotification } from "./notifications.js";
@@ -11,7 +19,7 @@ const $ = (selector) => document.querySelector(selector);
 const state = {
   emailStatus: "idle",
   temperature: "hot",
-  strength: "regular",
+  coffee: "cappuccino",
   art: "heart",
   timing: "now",
   phase: "idle",
@@ -30,6 +38,7 @@ try {
 if (renderer) initScene();
 initControls();
 initOrders();
+reset();
 
 function initScene() {
   const host = $("#scene");
@@ -85,6 +94,8 @@ function initScene() {
     color: 0x42200f,
     roughness: 0.26,
     clearcoat: 0.65,
+    transparent: true,
+    depthWrite: false,
   });
   const foamMat = new THREE.MeshStandardMaterial({
     color: 0xffefd4,
@@ -128,12 +139,8 @@ function initScene() {
   glassFoot.position.y = -1.03;
   cup.add(glassFoot);
 
-  const handle = new THREE.Mesh(
-    new THREE.TorusGeometry(0.48, 0.105, 20, 60, Math.PI * 1.65),
-    ceramic,
-  );
-  handle.position.set(1.04, 0.05, 0);
-  handle.rotation.z = -Math.PI * 0.825;
+  const handle = new THREE.Mesh(createHandleGeometry(), ceramic);
+  handle.castShadow = true;
   cup.add(handle);
   const saucer = new THREE.Mesh(
     new THREE.LatheGeometry(
@@ -457,40 +464,45 @@ function initScene() {
     advancePreparation(dt, time);
     const t = state.elapsed,
       {
-        milk,
+        amounts,
+        coffee: coffeeP,
+        pour,
         foam: foamP,
         level,
         radius,
         foamHeight,
         foamRadius,
-      } = recipeAt(t, state.strength);
+      } = recipeAt(t, state.coffee, state.temperature);
     const active = state.phase !== "idle";
     liquid.visible = active;
     if (level !== lastLevel) {
       updateLiquid(level);
       lastLevel = level;
     }
-    const dark = new THREE.Color(
-        state.strength === "strong" ? 0x351a0c : 0x50270f,
-      ),
-      latte = new THREE.Color(
-        state.strength === "strong" ? 0xa46d3f : 0xc69a65,
-      );
-    coffeeMat.color.copy(dark).lerp(latte, milk * 0.94);
+    const milkFraction =
+      amounts.milk / Math.max(1, amounts.espresso + amounts.milk);
+    const black = state.coffee === "long-black";
+    if (black) {
+      coffeeMat.color.set(0xd9ebe7).lerp(new THREE.Color(0x3e2113), coffeeP);
+      coffeeMat.opacity = 0.16 + 0.84 * coffeeP;
+    } else {
+      coffeeMat.color
+        .set(0x45220f)
+        .lerp(new THREE.Color(0xe0bc87), Math.pow(milkFraction, 0.9) * 0.96);
+      coffeeMat.opacity = 1;
+    }
     const motion = reduced ? 0 : Math.sin(time * 3) * (0.004 + hover) + impulse;
     top.rotation.x = -Math.PI / 2 + motion * 0.4;
     foamSurface.visible = foamP > 0;
     foamSurface.position.y = level;
     foamSurface.rotation.x = motion * 0.4;
-    foam.scale.set(foamRadius, Math.max(0.001, foamP), foamRadius);
+    foam.scale.set(foamRadius, Math.max(0.001, foamHeight / 0.13), foamRadius);
     foam.position.y = foamHeight / 2;
     foamTop.position.y = foamHeight + 0.003;
     foamTop.scale.setScalar(foamRadius);
     foamTop.visible = foamP > 0.55;
     art.scale.setScalar(smooth(foamP, 0.55, 1));
-    const pouring =
-      state.phase === "making" &&
-      (t < 3.5 || (t > 3.8 && t < 7.5) || (t > 7.8 && t < 10.5));
+    const pouring = state.phase === "making" && Boolean(pour);
     stream.visible = pouring;
     ripples.visible = pouring;
     droplets.visible = pouring;
@@ -498,8 +510,8 @@ function initScene() {
       const bottom = level + foamHeight,
         topY = 1.78,
         height = topY - bottom;
-      const phaseStart = t < 3.8 ? 0 : t < 7.8 ? 3.8 : 7.8;
-      const phaseEnd = t < 3.8 ? 3.5 : t < 7.8 ? 7.5 : 10.5;
+      const phaseStart = pour.start,
+        phaseEnd = pour.end;
       const envelope = Math.min(
         smooth(t, phaseStart, phaseStart + 0.18),
         1 - smooth(t, phaseEnd - 0.18, phaseEnd),
@@ -527,8 +539,15 @@ function initScene() {
       positions.needsUpdate = true;
       streamGeometry.computeVertexNormals();
       stream.material.color.set(
-        t < 3.8 ? 0x512b15 : t < 7.8 ? 0xf4e5cd : 0xffefd4,
+        pour.type === "espresso"
+          ? 0x512b15
+          : pour.type === "water"
+            ? 0xe1f0ee
+            : pour.type === "milk"
+              ? 0xf4e5cd
+              : 0xffefd4,
       );
+      stream.material.opacity = pour.type === "water" ? 0.48 : 0.94;
       flowTexture.offset.y = -time * 1.7;
       droplets.children.forEach((m, i) => {
         const fall = (time * 1.6 + i / 5) % 1;
@@ -545,7 +564,7 @@ function initScene() {
         m.position.set(0.12, bottom + 0.008, -0.08);
         m.scale.setScalar(0.045 + age * 0.12);
         m.material.opacity = (1 - age) * 0.2;
-        m.material.color.set(t < 3.8 ? 0xc28d54 : 0xf8edd9);
+        m.material.color.set(pour.type === "espresso" ? 0xc28d54 : 0xf8edd9);
       });
     }
     iceGroup.visible = state.temperature === "iced" && active;
@@ -566,7 +585,7 @@ function initScene() {
       const age = ((time - state.readyAt) * 0.2 + i / 12) % 1;
       m.position.set(
         Math.sin(age * 4 + i) * 0.13,
-        0.68 + age * 0.95,
+        level + foamHeight + 0.08 + age * 0.95,
         Math.cos(i * 2) * 0.12,
       );
       m.scale.setScalar(0.3 + age * 0.65);
@@ -606,10 +625,13 @@ function reset() {
   $("#status").textContent = "Good things take a little time.";
   $("#progress-fill").style.width = "0%";
   $(".progress").setAttribute("aria-valuenow", "0");
+  const recipe = getRecipe(state.coffee, state.temperature);
   $("#cup-label").textContent =
-    state.temperature === "hot" ? "THE WARM CLASSIC" : "A COOL LITTLE ESCAPE";
-  $("#recipe-ratio").textContent =
-    state.strength === "regular" ? "1 : 1 : 1" : "2 : 1 : 1";
+    `${state.temperature === "hot" ? "HOT" : "ICED"} ${recipe.name.toUpperCase()}`;
+  $("#recipe-label").textContent = recipe.ratioLabel;
+  $("#recipe-ratio").textContent = recipe.ratio;
+  $("#coffee-description").textContent = recipe.description;
+  $("#art-field").hidden = !recipe.hasMilk;
   setInteractionLock();
   resetScene();
 }
@@ -620,7 +642,7 @@ function clearNotification() {
   $("#retry-notification").hidden = true;
 }
 function initControls() {
-  for (const id of ["temperature", "strength", "art", "timing"])
+  for (const id of ["temperature", "coffee", "art", "timing"])
     $(`#${id}`).addEventListener("click", (e) => {
       const button = e.target.closest("button");
       if (!button || button.disabled || state[id] === button.dataset.value)
@@ -656,16 +678,14 @@ function advancePreparation(dt, time) {
     state.readyAt = time;
     setInteractionLock();
     $("#status").textContent =
-      state.temperature === "hot"
-        ? "Your hot cappuccino is ready. Enjoy slowly."
-        : "Your iced cappuccino is ready. Stay cool.";
+      `Your ${state.temperature === "hot" ? "hot" : "iced"} ${getRecipe(state.coffee, state.temperature).name} is ready. Enjoy.`;
     $("#state-label").textContent = "MADE WITH A LITTLE LOVE";
   } else
-    $("#status").textContent = [
-      "Pulling a rich espresso…",
-      "Folding in silky milk…",
-      "A soft finish, made just for you…",
-    ][Math.min(2, Math.floor(state.elapsed / 4))];
+    $("#status").textContent = recipeAt(
+      state.elapsed,
+      state.coffee,
+      state.temperature,
+    ).message;
   const percent = Math.round((state.elapsed / DURATION) * 100);
   $("#progress-fill").style.width = `${percent}%`;
   $(".progress").setAttribute("aria-valuenow", String(percent));
@@ -735,7 +755,11 @@ function initOrders() {
     state.phase = "making";
     state.elapsed = 0;
     beginScene();
-    $("#status").textContent = "Pulling a rich espresso…";
+    $("#status").textContent = recipeAt(
+      0,
+      state.coffee,
+      state.temperature,
+    ).message;
     $("#progress-fill").style.width = "0%";
     $(".progress").setAttribute("aria-valuenow", "0");
     void submitNotification();

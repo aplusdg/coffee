@@ -9,7 +9,7 @@ import {
 const order = buildOrder({
   name: "Maddy",
   temperature: "iced",
-  strength: "strong",
+  coffee: "latte",
   art: "logo",
   timing: "now",
 });
@@ -20,7 +20,9 @@ test("notification has a fixed recipient and all order details", () => {
   );
   const p = notificationPayload(order);
   assert.equal(p.Name, "Maddy");
-  assert.equal(p.Coffee, "Iced Strong Cappuccino");
+  assert.equal(p.Coffee, "Iced Latte");
+  assert.match(p._subject, /Iced Latte/);
+  assert.equal(p.Recipe, order.recipe);
   assert.equal(p["Latte art"], "A+ Design Group logo");
   assert.equal(p["Pickup timestamp"], order.pickup_iso);
   assert.equal(p["Time zone"], order.pickup_timezone);
