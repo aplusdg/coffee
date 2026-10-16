@@ -9,11 +9,13 @@ test("every liquid surface and foam rim stays inside the tapered cup at every st
       assert(level >= FLOOR && level + foamHeight < RIM - 0.15);
       assert(radius < innerRadius(level) - 0.04);
       // Allow for foam motion; even its outer crema ring must clear the wall.
-      assert(foamRadius * 0.977 + 0.015 < innerRadius(level + foamHeight - 0.015));
+      assert(
+        foamRadius * 0.977 + 0.015 < innerRadius(level + foamHeight - 0.015),
+      );
       // The ice cubes, including rotation and drift, have room inside.
-      const orbit = Math.min(0.6, radius - 0.23);
-      assert(orbit + 0.21 + 0.02 < innerRadius(Math.max(FLOOR + 0.19, level)));
-      assert(level + 0.08 + 0.2 < RIM);
+      const orbit = Math.min(0.58, radius - 0.27);
+      assert(orbit + 0.25 + 0.02 < innerRadius(Math.max(FLOOR + 0.22, level)));
+      assert(level + 0.06 + 0.25 < RIM);
     }
 });
 test("Strong changes the espresso portion while keeping final fill and foam below the rim", () => {

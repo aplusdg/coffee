@@ -45,15 +45,62 @@
           </div>
           <div id="fallback" hidden>
             3D is unavailable in this browser. You can still choose your coffee
-            and place a request below.
+            and send your request.
           </div>
         </section>
-        <section class="panel" aria-label="Customize your cappuccino">
+        <form
+          class="panel"
+          id="order-form"
+          aria-label="Create your coffee request"
+        >
           <div class="panel-heading">
             <span>Your daily cup</span><small>MAKE IT YOURS</small>
           </div>
+          <div class="honeypot" aria-hidden="true">
+            <label
+              >Leave this empty<input
+                id="website"
+                name="website"
+                autocomplete="off"
+                tabindex="-1"
+            /></label>
+          </div>
+          <fieldset class="identity-field">
+            <legend><span>01</span> Who's this cup for?</legend>
+            <label class="sr-only" for="customer-name">Your name</label>
+            <input
+              id="customer-name"
+              name="name"
+              autocomplete="name"
+              maxlength="80"
+              required
+              placeholder="Your name"
+            />
+          </fieldset>
+          <fieldset class="time-field">
+            <legend><span>02</span> When would you like it?</legend>
+            <div class="choices" id="timing">
+              <button
+                type="button"
+                data-value="now"
+                class="selected"
+                aria-pressed="true"
+              >
+                Right now</button
+              ><button type="button" data-value="custom" aria-pressed="false">
+                Choose a time
+              </button>
+            </div>
+            <label id="custom-time-field" hidden
+              >Your preferred time<input
+                type="datetime-local"
+                id="pickup-time"
+                name="pickup-time"
+                disabled /><small id="timezone-label"></small
+            ></label>
+          </fieldset>
           <fieldset>
-            <legend><span>01</span> Your temperature</legend>
+            <legend><span>03</span> Your temperature</legend>
             <div class="choices" id="temperature">
               <button
                 type="button"
@@ -68,7 +115,7 @@
             </div>
           </fieldset>
           <fieldset>
-            <legend><span>02</span> Your coffee strength</legend>
+            <legend><span>04</span> Your coffee strength</legend>
             <div class="choices strength" id="strength">
               <button
                 type="button"
@@ -83,7 +130,7 @@
             </div>
           </fieldset>
           <fieldset>
-            <legend><span>03</span> A finishing touch</legend>
+            <legend><span>05</span> A finishing touch</legend>
             <div class="choices art-choices" id="art">
               <button
                 type="button"
@@ -107,7 +154,7 @@
             <span>ESPRESSO + MILK + FOAM</span
             ><b id="recipe-ratio">1 : 1 : 1</b>
           </div>
-          <button id="make" class="make" type="button">
+          <button id="make" class="make" type="submit">
             Make my coffee <span aria-hidden="true" class="arrow-icon"></span>
           </button>
           <div class="status" role="status" aria-live="polite">
@@ -123,88 +170,20 @@
           >
             <div id="progress-fill"></div>
           </div>
-        </section>
-      </main>
-      <section class="order-panel" aria-labelledby="order-title">
-        <div class="order-intro">
-          <div class="eyebrow">ONE MORE LITTLE THING</div>
-          <h2 id="order-title">Who's this cup for?</h2>
-          <p>
-            Leave your name and a time.<br /> We'll email your request to the
-            coffee host.
+          <p class="send-hint">
+            Make starts your coffee and sends your request.
           </p>
-        </div>
-        <form id="order-form">
-          <div class="honeypot" aria-hidden="true">
-            <label
-              >Leave this empty<input
-                id="website"
-                name="website"
-                autocomplete="off"
-                tabindex="-1"
-            /></label>
-          </div>
-          <div class="order-fields">
-            <label
-              >Your name<input
-                id="customer-name"
-                name="name"
-                autocomplete="name"
-                maxlength="80"
-                required
-                placeholder="e.g. Maddy"
-            /></label>
-            <fieldset class="time-field">
-              <legend>When would you like it?</legend>
-              <div class="choices" id="timing">
-                <button
-                  type="button"
-                  data-value="now"
-                  class="selected"
-                  aria-pressed="true"
-                >
-                  Right now</button
-                ><button type="button" data-value="custom" aria-pressed="false">
-                  Choose a time
-                </button>
-              </div>
-            </fieldset>
-            <label id="custom-time-field" hidden
-              >Your preferred time<input
-                type="datetime-local"
-                id="pickup-time"
-                name="pickup-time" /><small id="timezone-label"></small
-            ></label>
-          </div>
-          <div class="order-bottom">
-            <p id="order-hint">
-              Make your coffee above, then send your request.
-            </p>
-            <button class="make" id="order-submit" disabled type="submit">
-              Review coffee request
-              <span aria-hidden="true" class="arrow-icon"></span>
-            </button>
-          </div>
-          <p id="order-status" role="status" aria-live="polite"></p>
+          <p id="notification-status" role="status" aria-live="polite"></p>
+          <button
+            id="retry-notification"
+            class="retry-button"
+            type="button"
+            hidden
+          >
+            Retry sending
+          </button>
         </form>
-      </section>
-      <dialog id="order-dialog" aria-labelledby="review-title">
-        <button
-          type="button"
-          class="dialog-close"
-          aria-label="Close order review"
-        >
-          ×
-        </button>
-        <div class="eyebrow">YOUR COFFEE REQUEST</div>
-        <h2 id="review-title">A cup with your name on it.</h2>
-        <dl id="order-summary"></dl>
-        <p id="delivery-note"></p>
-        <button type="button" id="send-order" class="make">
-          Send coffee request
-        </button>
-        <p id="delivery-status" role="status" aria-live="polite"></p>
-      </dialog>
+      </main>
       <footer>
         <span>TAKE A MOMENT. MAKE IT YOURS.</span
         ><span>CRAFTED WITH CARE. SIPPED WITH JOY.</span

@@ -1,14 +1,15 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 import { FLOOR, DURATION, liquidRadius, recipeAt, smooth } from "./recipe.js";
 import { createArtTexture } from "./brand.js";
-import { buildOrder, DEFAULT_RECIPIENTS } from "./order.js";
+import { buildOrder } from "./order.js";
 import { sendNotification } from "./notifications.js";
 import "./style.css";
 
 const $ = (selector) => document.querySelector(selector);
 const state = {
-  batch: 0,
+  emailStatus: "idle",
   temperature: "hot",
   strength: "regular",
   art: "heart",
@@ -223,36 +224,112 @@ function initScene() {
   const iceGroup = new THREE.Group();
   cup.add(iceGroup);
   const iceMat = new THREE.MeshPhysicalMaterial({
-    color: 0xf4fbff,
-    transmission: 0.8,
-    roughness: 0.16,
-    thickness: 0.35,
+    color: 0xe4f5ff,
+    vertexColors: true,
+    transmission: 0.98,
+    roughness: 0.018,
+    thickness: 0.18,
     ior: 1.31,
+    transparent: true,
+    opacity: 0.46,
+    depthWrite: false,
+    clearcoat: 1,
+    clearcoatRoughness: 0.025,
+    envMapIntensity: 0.75,
+    attenuationColor: 0x86c8dc,
+    attenuationDistance: 1.5,
+  });
+  const iceGeometry = new RoundedBoxGeometry(0.29, 0.27, 0.29, 3, 0.035);
+  // Cooler side faces make clear ice legible over white foam without wire outlines.
+  const iceNormals = iceGeometry.attributes.normal;
+  const iceColors = new Float32Array(iceNormals.count * 3);
+  const coolSide = new THREE.Color(0x4e9fbf),
+    clearTop = new THREE.Color(0xe3f8ff);
+  for (let i = 0; i < iceNormals.count; i++) {
+    const tint = coolSide.clone().lerp(clearTop, Math.abs(iceNormals.getY(i)));
+    iceColors.set([tint.r, tint.g, tint.b], i * 3);
+  }
+  iceGeometry.setAttribute("color", new THREE.BufferAttribute(iceColors, 3));
+
+  const bubbleGeometry = new THREE.SphereGeometry(0.007, 6, 5);
+  const iceBubbleMaterial = new THREE.MeshBasicMaterial({
+    color: 0xe7f8ff,
+    transparent: true,
+    opacity: 0.3,
+    depthWrite: false,
   });
   for (let i = 0; i < 5; i++) {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.23, 0.24), iceMat);
-    const a = (i * Math.PI * 2) / 5;
-    m.userData = { a, phase: i };
-    const edges = new THREE.LineSegments(
-      new THREE.EdgesGeometry(m.geometry),
-      new THREE.LineBasicMaterial({
-        color: 0x99b5ae,
-        transparent: true,
-        opacity: 0.35,
-      }),
-    );
-    m.add(edges);
-
+    const m = new THREE.Mesh(iceGeometry, iceMat);
+    m.userData = { a: (i * Math.PI * 2) / 5, phase: i };
     m.rotation.set(0.1 + i * 0.07, i, 0.1);
+    for (let j = 0; j < 3; j++) {
+      const bubble = new THREE.Mesh(bubbleGeometry, iceBubbleMaterial);
+      bubble.position.set(
+        (j - 1) * 0.035,
+        ((i % 3) - 1) * 0.025,
+        (j % 2 ? 1 : -1) * 0.035,
+      );
+      m.add(bubble);
+    }
     iceGroup.add(m);
   }
-  // Pouring begins just inside the rim; no oversized pipe above the cup.
-  const stream = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.035, 1, 12),
-    coffeeMat.clone(),
-  );
+  // A moving, tapered stream falls from above the rim into the center of the cup.
+  const flowCanvas = document.createElement("canvas");
+  flowCanvas.width = 64;
+  flowCanvas.height = 256;
+  const flowContext = flowCanvas.getContext("2d");
+  flowContext.fillStyle = "#888";
+  flowContext.fillRect(0, 0, 64, 256);
+  for (let i = 0; i < 180; i++) {
+    const shade = 90 + ((i * 47) % 120);
+    flowContext.fillStyle = `rgb(${shade},${shade},${shade})`;
+    flowContext.fillRect(
+      (i * 19) % 64,
+      (i * 37) % 256,
+      1 + (i % 3),
+      12 + (i % 23),
+    );
+  }
+  const flowTexture = new THREE.CanvasTexture(flowCanvas);
+  flowTexture.wrapS = flowTexture.wrapT = THREE.RepeatWrapping;
+  flowTexture.repeat.set(2, 3);
+  const streamGeometry = new THREE.CylinderGeometry(1, 1, 1, 24, 28, true);
+  const streamOriginal = streamGeometry.attributes.position.array.slice();
+  const streamMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0x512b15,
+    roughness: 0.16,
+    clearcoat: 1,
+    clearcoatRoughness: 0.06,
+    bumpMap: flowTexture,
+    bumpScale: 0.018,
+    transparent: true,
+    opacity: 0.94,
+    depthWrite: false,
+  });
+  const stream = new THREE.Mesh(streamGeometry, streamMaterial);
   stream.visible = false;
   cup.add(stream);
+  const droplets = new THREE.Group();
+  cup.add(droplets);
+  const dropletGeometry = new THREE.SphereGeometry(1, 10, 8);
+  for (let i = 0; i < 5; i++)
+    droplets.add(new THREE.Mesh(dropletGeometry, streamMaterial));
+
+  const ripples = new THREE.Group();
+  cup.add(ripples);
+  for (let i = 0; i < 2; i++) {
+    const ripple = new THREE.Mesh(
+      new THREE.TorusGeometry(1, 0.025, 5, 48),
+      new THREE.MeshBasicMaterial({
+        color: 0xe4c49c,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false,
+      }),
+    );
+    ripple.rotation.x = -Math.PI / 2;
+    ripples.add(ripple);
+  }
   const steam = new THREE.Group();
   cup.add(steam);
   const canvas = document.createElement("canvas");
@@ -411,22 +488,73 @@ function initScene() {
     foamTop.scale.setScalar(foamRadius);
     foamTop.visible = foamP > 0.55;
     art.scale.setScalar(smooth(foamP, 0.55, 1));
-    stream.visible =
+    const pouring =
       state.phase === "making" &&
       (t < 3.5 || (t > 3.8 && t < 7.5) || (t > 7.8 && t < 10.5));
-    const streamBottom = level + foamHeight;
-    stream.scale.y = Math.max(0.001, 0.87 - streamBottom);
-    stream.position.set(0.12, (0.87 + streamBottom) / 2, -0.08);
-    stream.material.color.set(
-      t < 3.8 ? 0x512b15 : t < 7.8 ? 0xf4e5cd : 0xffefd4,
-    );
+    stream.visible = pouring;
+    ripples.visible = pouring;
+    droplets.visible = pouring;
+    if (pouring) {
+      const bottom = level + foamHeight,
+        topY = 1.78,
+        height = topY - bottom;
+      const phaseStart = t < 3.8 ? 0 : t < 7.8 ? 3.8 : 7.8;
+      const phaseEnd = t < 3.8 ? 3.5 : t < 7.8 ? 7.5 : 10.5;
+      const envelope = Math.min(
+        smooth(t, phaseStart, phaseStart + 0.18),
+        1 - smooth(t, phaseEnd - 0.18, phaseEnd),
+      );
+      const positions = streamGeometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) {
+        const j = i * 3,
+          fraction = streamOriginal[j + 1] + 0.5;
+        const wave =
+          Math.sin(time * 18 - fraction * 17) * 0.16 +
+          Math.sin(time * 27 - fraction * 31) * 0.08;
+        const width =
+          (0.076 + (1 - fraction) * 0.013) *
+          (1 + wave) *
+          Math.max(0.01, envelope);
+        positions.setXYZ(
+          i,
+          0.12 +
+            streamOriginal[j] * width +
+            Math.sin(fraction * 13 - time * 15) * 0.012,
+          bottom + fraction * height,
+          -0.08 + streamOriginal[j + 2] * width,
+        );
+      }
+      positions.needsUpdate = true;
+      streamGeometry.computeVertexNormals();
+      stream.material.color.set(
+        t < 3.8 ? 0x512b15 : t < 7.8 ? 0xf4e5cd : 0xffefd4,
+      );
+      flowTexture.offset.y = -time * 1.7;
+      droplets.children.forEach((m, i) => {
+        const fall = (time * 1.6 + i / 5) % 1;
+        m.position.set(
+          0.12 + Math.sin(i * 2.4) * 0.075,
+          bottom + (1 - fall) * height,
+          -0.08 + Math.cos(i * 2.4) * 0.045,
+        );
+        m.scale.set(0.021, 0.052, 0.021);
+      });
+
+      ripples.children.forEach((m, i) => {
+        const age = (time * 1.8 + i / 2) % 1;
+        m.position.set(0.12, bottom + 0.008, -0.08);
+        m.scale.setScalar(0.045 + age * 0.12);
+        m.material.opacity = (1 - age) * 0.2;
+        m.material.color.set(t < 3.8 ? 0xc28d54 : 0xf8edd9);
+      });
+    }
     iceGroup.visible = state.temperature === "iced" && active;
     for (const m of iceGroup.children) {
       const { a, phase } = m.userData;
-      const orbit = Math.min(0.6, radius - 0.23);
+      const orbit = Math.min(0.58, radius - 0.27);
       m.position.set(
         Math.cos(a) * orbit + Math.sin(time + phase) * hover,
-        Math.max(FLOOR + 0.19, level + 0.08 * foamP) +
+        Math.max(FLOOR + 0.22, level + 0.06 * foamP) +
           Math.sin(time * 1.4 + phase) * 0.012,
         Math.sin(a) * orbit,
       );
@@ -455,11 +583,26 @@ function initScene() {
   resetScene();
   frame();
 }
+function setInteractionLock() {
+  const busy = state.phase === "making" || state.emailStatus === "sending";
+  $("#make").disabled = busy;
+  document
+    .querySelectorAll(".panel .choices button, #customer-name")
+    .forEach((el) => (el.disabled = busy));
+  $("#pickup-time").disabled = busy || state.timing !== "custom";
+  $("#retry-notification").disabled = busy;
+  if (busy)
+    $("#make").innerHTML =
+      "Making your moment <span aria-hidden='true' class='spinner-icon'></span>";
+  else
+    $("#make").innerHTML =
+      state.phase === "ready"
+        ? "Make another <span aria-hidden='true' class='replay-icon'></span>"
+        : "Make my coffee <span aria-hidden='true' class='arrow-icon'></span>";
+}
 function reset() {
   state.phase = "idle";
   state.elapsed = 0;
-  $("#make").innerHTML =
-    "Make my coffee <span aria-hidden='true' class='arrow-icon'></span>";
   $("#status").textContent = "Good things take a little time.";
   $("#progress-fill").style.width = "0%";
   $(".progress").setAttribute("aria-valuenow", "0");
@@ -467,47 +610,35 @@ function reset() {
     state.temperature === "hot" ? "THE WARM CLASSIC" : "A COOL LITTLE ESCAPE";
   $("#recipe-ratio").textContent =
     state.strength === "regular" ? "1 : 1 : 1" : "2 : 1 : 1";
-  $("#order-submit").disabled = true;
-  $("#order-hint").textContent =
-    "Make your coffee above, then send your request.";
-  $("#order-status").textContent = "";
+  setInteractionLock();
   resetScene();
+}
+function clearNotification() {
+  if (state.emailStatus === "sending") return;
+  state.emailStatus = "idle";
+  $("#notification-status").textContent = "";
+  $("#retry-notification").hidden = true;
 }
 function initControls() {
   for (const id of ["temperature", "strength", "art", "timing"])
     $(`#${id}`).addEventListener("click", (e) => {
       const button = e.target.closest("button");
-      if (!button || button.disabled) return;
+      if (!button || button.disabled || state[id] === button.dataset.value)
+        return;
       state[id] = button.dataset.value;
       for (const b of $(`#${id}`).querySelectorAll("button")) {
         b.classList.toggle("selected", b === button);
         b.setAttribute("aria-pressed", String(b === button));
       }
+      clearNotification();
       if (id === "timing") {
         $("#custom-time-field").hidden = state.timing !== "custom";
         $("#pickup-time").required = state.timing === "custom";
-        return;
-      }
-      if (id === "art" && state.phase === "ready") {
-        resetScene();
+        setInteractionLock();
         return;
       }
       reset();
     });
-  $("#make").addEventListener("click", () => {
-    state.batch++;
-    state.phase = "making";
-    state.elapsed = 0;
-    $("#make").disabled = true;
-    $("#make").innerHTML =
-      "Making your moment <span aria-hidden='true' class='spinner-icon'></span>";
-    $("#order-submit").disabled = true;
-    document
-      .querySelectorAll(".panel .choices button")
-      .forEach((b) => (b.disabled = true));
-    beginScene();
-  });
-  // Keep the order flow usable when WebGL is unavailable.
   if (!renderer) {
     let last = performance.now();
     setInterval(() => {
@@ -523,20 +654,12 @@ function advancePreparation(dt, time) {
   if (state.elapsed >= DURATION) {
     state.phase = "ready";
     state.readyAt = time;
-    $("#make").disabled = false;
-    $("#make").innerHTML =
-      "Make another <span aria-hidden='true' class='replay-icon'></span>";
-    document
-      .querySelectorAll(".panel .choices button")
-      .forEach((b) => (b.disabled = false));
+    setInteractionLock();
     $("#status").textContent =
       state.temperature === "hot"
         ? "Your hot cappuccino is ready. Enjoy slowly."
         : "Your iced cappuccino is ready. Stay cool.";
     $("#state-label").textContent = "MADE WITH A LITTLE LOVE";
-    $("#order-submit").disabled = false;
-    $("#order-hint").textContent =
-      "Your cup is ready. Add your name and preferred time.";
   } else
     $("#status").textContent = [
       "Pulling a rich espresso…",
@@ -548,9 +671,11 @@ function advancePreparation(dt, time) {
   $(".progress").setAttribute("aria-valuenow", String(percent));
 }
 function initOrders() {
-  const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  $("#timezone-label").textContent = `Your local time · ${zone}`;
-  const timeInput = $("#pickup-time");
+  const form = $("#order-form"),
+    timeInput = $("#pickup-time"),
+    nameInput = $("#customer-name");
+  $("#timezone-label").textContent =
+    `Your local time · ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
   const updateMin = () => {
     const d = new Date(Date.now() + 60000);
     d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
@@ -558,112 +683,83 @@ function initOrders() {
   };
   updateMin();
   timeInput.addEventListener("focus", updateMin);
-  const dialog = $("#order-dialog");
-  $(".dialog-close").addEventListener("click", () => dialog.close());
-  dialog.addEventListener("click", (e) => {
-    if (e.target === dialog) {
-      const r = dialog.getBoundingClientRect();
-      if (
-        e.clientX < r.left ||
-        e.clientX > r.right ||
-        e.clientY < r.top ||
-        e.clientY > r.bottom
-      )
-        dialog.close();
-    }
-  });
-  let order,
-    fingerprint = "",
-    submitted = false,
-    pending = false;
-  let lastAttempt = 0;
-  $("#order-form").addEventListener("submit", (e) => {
-    e.preventDefault();
-    if (state.phase !== "ready") return;
-    if (pending) return;
-    const nextFingerprint = JSON.stringify([
-      state.batch,
-      $("#customer-name").value.trim(),
-      state.temperature,
-      state.strength,
-      state.art,
-      state.timing,
-      timeInput.value,
-    ]);
+  for (const input of [nameInput, timeInput])
+    input.addEventListener("input", () => {
+      input.setCustomValidity("");
+      clearNotification();
+    });
+  let activeOrder = null,
+    lastAttempt = 0;
+  const submitNotification = async () => {
+    state.emailStatus = "sending";
+    $("#notification-status").textContent = "Sending your coffee request…";
+    $("#retry-notification").hidden = true;
+    setInteractionLock();
+    lastAttempt = Date.now();
     try {
-      const candidate = buildOrder({
-        name: $("#customer-name").value,
+      const result = await sendNotification(activeOrder);
+      state.emailStatus = result.status;
+      $("#notification-status").textContent =
+        result.status === "activation"
+          ? "Your host needs to activate notifications. Please ask them to check their inbox."
+          : "Request submitted. Your coffee host will confirm.";
+    } catch {
+      state.emailStatus = "failed";
+      $("#notification-status").textContent =
+        "We couldn't confirm your request. You can retry sending below.";
+      $("#retry-notification").hidden = false;
+    } finally {
+      setInteractionLock();
+    }
+  };
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (
+      state.phase === "making" ||
+      state.emailStatus === "sending" ||
+      $("#website").value
+    )
+      return;
+    try {
+      activeOrder = buildOrder({
+        name: nameInput.value,
         ...state,
         pickupValue: timeInput.value,
       });
-      if (fingerprint !== nextFingerprint) {
-        order = candidate;
-        fingerprint = nextFingerprint;
-        submitted = false;
-      }
     } catch (error) {
-      $("#order-status").textContent = error.message;
+      const input = nameInput.value.trim() ? timeInput : nameInput;
+      input.setCustomValidity(error.message);
+      input.reportValidity();
       return;
     }
-    $("#order-status").textContent = "";
-    $("#order-summary").replaceChildren();
-    const rows = [
-      ["Name", order.customer_name],
-      ["Coffee", `${order.temperature} ${order.strength} cappuccino`],
-      ["Latte art", order.latte_art],
-      ["Requested time", order.pickup_time],
-      ["Notify", DEFAULT_RECIPIENTS.join(", ")],
-    ];
-    for (const [label, value] of rows) {
-      const dt = document.createElement("dt"),
-        dd = document.createElement("dd");
-      dt.textContent = label;
-      dd.textContent = value;
-      $("#order-summary").append(dt, dd);
-    }
-    $("#send-order").disabled = submitted;
-    $("#delivery-note").textContent =
-      "Your name and coffee details will be emailed to the host via FormSubmit. Your coffee is confirmed when the host replies.";
-    $("#delivery-status").textContent = submitted
-      ? "This request has already been submitted. Please wait for the coffee host to confirm."
-      : "";
-    dialog.showModal();
+    state.phase = "making";
+    state.elapsed = 0;
+    beginScene();
+    $("#status").textContent = "Pulling a rich espresso…";
+    $("#progress-fill").style.width = "0%";
+    $(".progress").setAttribute("aria-valuenow", "0");
+    void submitNotification();
   });
-  $("#send-order").addEventListener("click", async () => {
-    if (!order || pending || submitted) return;
+  $("#retry-notification").addEventListener("click", () => {
     if (
-      order.pickup_mode === "custom" &&
-      new Date(order.pickup_iso) <= new Date()
-    ) {
-      $("#delivery-status").textContent =
-        "This pickup time has passed. Close this preview and choose a future time.";
+      !activeOrder ||
+      state.phase === "making" ||
+      state.emailStatus !== "failed"
+    )
       return;
-    }
-    if ($("#website").value) return;
     if (Date.now() - lastAttempt < 10000) {
-      $("#delivery-status").textContent =
-        "Please wait a few seconds before trying again.";
+      $("#notification-status").textContent =
+        "Please wait a moment before retrying.";
       return;
     }
-    pending = true;
-    lastAttempt = Date.now();
-    $("#send-order").disabled = true;
-    $("#delivery-status").textContent = "Sending your coffee request…";
-    try {
-      const result = await sendNotification(order);
-      submitted = true;
-      const message =
-        result.status === "activation"
-          ? "The coffee host needs to activate email notifications. Please ask them to check their inbox before sending a new request."
-          : "Request submitted. Please wait for the coffee host to confirm.";
-      $("#delivery-status").textContent = message;
-      $("#order-status").textContent = message;
-    } catch {
-      $("#delivery-status").textContent =
-        "Your request could not be confirmed. Please try again in a moment.";
-      $("#send-order").disabled = false;
-    } finally {
-      pending = false;
+    if (
+      activeOrder.pickup_mode === "custom" &&
+      new Date(activeOrder.pickup_iso) <= new Date()
+    ) {
+      $("#notification-status").textContent =
+        "Please choose a future pickup time and make a new request.";
+      return;
     }
+    void submitNotification();
   });
 }
