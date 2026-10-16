@@ -7,8 +7,9 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check": "node --check src/main.js",
-    "check:dist": "node scripts/check-dist.mjs"
+    "check": "node --check src/main.js && node --check src/order.js && node --check src/recipe.js && node --check src/brand.js && node --check src/notifications.js",
+    "check:dist": "node scripts/check-dist.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "three": "^0.180.0"

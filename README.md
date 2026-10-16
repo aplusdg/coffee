@@ -1,33 +1,44 @@
-# 日常 · Coffee Atelier
+# A+ Coffee Atelier
 
-一个以 Vite + Three.js 构建的交互式 3D 卡布奇诺网页。磨砂玻璃控制面板，支持热饮陶瓷杯、冷饮透明玻璃杯、Regular / Strong、分阶段注入咖啡与牛奶、奶泡拉花、浮动冰块、持续蒸汽以及拖动旋转。兼容桌面和手机，遵循系统减少动态效果偏好。
+An interactive 3D cappuccino experience for A+ Design Group, built with Vite and Three.js. All website copy is in English. Choose hot ceramic or a tall, handle-free iced glass, Regular or Strong, and Heart, Star or A+ logo latte art. Watch espresso, milk and foam fill the cup, then drag to rotate. The cup's inner profile controls every surface radius, so liquid and foam remain within the walls. Iced drinks have floating ice; hot drinks have subtle steam. The interface supports phones, keyboard controls and reduced motion preferences.
 
-## 开发
+## Develop
 
-需要 Node.js 20.19+ 或 22.12+（已使用 Node.js 24 验证）。
+Node.js 20.19+ or 22.12+ is required (validated on Node 24).
 
 ```sh
 npm ci
 npm run dev
 ```
 
-在 Vite 输出的地址打开网页。选择温度与浓度，点击“开始制作”，约 11 秒完成；拖动杯子旋转，点击“再做一杯”重播。更换选项会清空杯子，准备新配方。无需 API、账号、环境变量或后端服务。3D 场景需要浏览器支持 WebGL。
-
-## 检查与构建
+In this cloud environment, use `npm ci --cache /workspace/.npm-cache` if the default npm cache is not writable.
 
 ```sh
 npm run check
+npm test
 npm run build
 npm run check:dist
 npm run preview
 ```
 
-构建文件位于 `dist/`，可部署到任意静态托管服务。开发与预览默认监听所有网卡，适合云环境。字体使用可选的 Google Fonts；不可用时自动使用本地宋体或衬线字体。所有杯子、液体、冰块与蒸汽均由代码生成，无外部模型依赖。
+`dist/` is the deployable site. There are no external model or font downloads. Tests cover fill containment, recipe strength, request validation and timestamps. A WebGL fallback keeps the order interface usable if 3D rendering is unsupported.
 
-## GitHub Pages 发布
+## Coffee requests and automatic email
 
-本项目必须先用 Vite 构建，再发布 `dist/`，不能直接发布仓库根目录的源码。源码中的 npm 导入和 CSS 导入由 Vite 处理，直接托管源码会导致无样式、按钮失效。
+After preparing a coffee, enter a name, choose **Right now** or a future date/time, and review the recipe. **Send coffee request** submits an automatic email notification to **terrinobb@gmail.com** using FormSubmit's AJAX endpoint. No account, API key, backend, or email application is needed. Custom time is the requested pickup time: the notification is sent immediately, not at that future time. Each request includes the complete recipe, a browser-local timezone, an ISO timestamp and a request ID. The coffee host still needs to confirm the request.
 
-仓库包含 `.github/workflows/deploy.yml`。推送到 `main` 后，GitHub Actions 会安装依赖、检查、构建并发布 `dist/`。资源使用相对路径，支持 `https://aplusdg.github.io/coffee/`。
+### Activate notifications once
 
-在仓库 **Settings → Pages → Build and deployment → Source** 中选择 **GitHub Actions**。在 **Actions → Deploy coffee to GitHub Pages** 查看发布结果；也可用 **Run workflow** 手动重新发布。第一次发布需要完成上述 Source 设置，再运行工作流。不要选择从 `main / (root)` 直接发布源码。
+1. After deploying to GitHub Pages, make a coffee, fill in a name, then **Review coffee request → Send coffee request**.
+2. Open **terrinobb@gmail.com**, including Spam, and find the FormSubmit activation email. Click **Activate Form** (or the confirmation link). This step proves ownership of the receiving inbox; it cannot be completed by this repository.
+3. Refresh the coffee page and submit a new request. Verify that the notification arrives. If the service asks to authorize a new origin, repeat activation for that host. Localhost and the production website may require separate activation.
+
+The app shows "Request submitted" only after an accepted service response; it does not claim guaranteed inbox delivery. Explicit activation responses get their own message. Until the inbox is activated, normal delivery is not ready, even if the form submission was accepted. Provider responses and delivery depend on the external service. No live inbox delivery is claimed by local or mocked tests.
+
+Failure states allow retries, duplicate clicks are disabled, identical successful requests cannot be re-sent in the same page session, and the client waits ten seconds between attempts. A hidden honeypot catches basic form bots. AJAX submission uses FormSubmit's captcha-free mode; client checks are not server-side abuse protection. FormSubmit receives the submitted name and coffee/time details. See https://formsubmit.co/ for service policies and quotas. A higher-volume service should use server-side rate limits or the provider's supported abuse controls.
+
+## GitHub Pages
+
+The source HTML imports JavaScript modules and styles through Vite. Publish **the built `dist/` directory**, never the repository root. The included workflow installs locked dependencies, runs checks and tests, builds, validates relative asset paths, then deploys to Pages.
+
+Set **Settings → Pages → Build and deployment → Source → GitHub Actions** once. Pushing to `main` publishes updates automatically. See **Actions → Deploy coffee to GitHub Pages** for progress, or use **Run workflow** to redeploy. Relative URLs support `https://aplusdg.github.io/coffee/` and other static hosts.
